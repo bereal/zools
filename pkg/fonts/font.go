@@ -2,9 +2,12 @@ package fonts
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"strings"
 
 	"golang.org/x/text/encoding/charmap"
+	"gopkg.in/yaml.v3"
 )
 
 type CharLine struct {
@@ -107,4 +110,24 @@ func (f *Font) Encode() []byte {
 		}
 	}
 	return result
+}
+
+func (f *Font) Write(w io.Writer) error {
+	_, err := w.Write(f.Encode())
+	return err
+}
+
+func (f *Font) ReadYaml(r io.Reader) error {
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]string)
+	if err = yaml.Unmarshal(data, &m); err != nil {
+		return nil
+	}
+
+	f.ParseChars(m)
+	return nil
 }
