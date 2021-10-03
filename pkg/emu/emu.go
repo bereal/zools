@@ -3,6 +3,8 @@ package emu
 import (
 	"context"
 	"fmt"
+	"image"
+	"image/color"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -38,7 +40,6 @@ func Sjasmplus(code string, include []string) ([]byte, error) {
 	}
 	result, err := cmd.Output()
 	if err != nil {
-		println(string(err.(*exec.ExitError).Stderr))
 		return nil, err
 	}
 	return result, nil
@@ -59,4 +60,28 @@ func Run(code string, include []string, addr uint16) (*z80.CPU, error) {
 	}
 
 	return cpu, nil
+}
+
+func DumpScreen(mem z80.Memory, addr uint16) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, 255, 191))
+	var i uint16
+	for i = 0; i < 0x1800; i++ {
+		x := (i & 0x1f) << 3
+		y := (i>>5)&0xc0 | (i>>2)&0x38 | (i>>8)&7
+		v := mem.Get(addr + i)
+
+		var mask uint8
+		for mask = 0x80; mask != 0; mask >>= 1 {
+			var col color.RGBA
+			col.A = 0xff
+			if mask&v == 0 {
+				col.R = 0xff
+				col.G = 0xff
+				col.B = 0xff
+			}
+			img.SetRGBA(int(x), int(y), col)
+			x++
+		}
+	}
+	return img
 }
