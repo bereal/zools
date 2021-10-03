@@ -1,0 +1,92 @@
+; Memory queue structure:
+; For each block:
+;  15 bits - addr of the next block (blocks are word-aligned)
+;  1 bit - 1 if block is free
+;  N bytes - data
+
+; input:
+;       HL - queue addr
+; output
+;       HL - block addr
+; if the queue is fully allocated, memory will be corrupted
+balloc:
+                PUSH    AF
+                PUSH    DE
+
+balloc_loop:
+                LD      E, (HL)
+                LD      A, 1
+                AND     E
+                JR      NZ, balloc_found
+
+                INC     HL
+                LD      D, (HL)
+                EX      DE, HL
+                JR      balloc_loop
+
+balloc_found:
+                LD      A, 0xFE
+                AND     E
+                LD      (HL), A
+                INC     HL
+                INC     HL
+
+                POP     DE
+                POP     AF
+                RET
+
+
+; HL - address (must be even)
+; DE - block size (must be even)
+; BC - number of blocks
+balloc_init:
+                PUSH    BC
+                PUSH    DE
+                PUSH    HL
+
+                LD      (balloc_init_loop+1), DE
+
+balloc_init_loop:
+                LD      DE, 0  ; block size
+                EX      DE, HL ; DE = HL + DE + 2 = next block addr + 1 to mark it free
+                ADD     HL, DE
+                INC     HL
+                INC     HL
+                INC     HL
+                EX      DE, HL
+
+                LD      (HL), E
+                INC     HL
+                LD      (HL), D
+                INC     HL
+
+                DEC     DE
+                EX      DE, HL ; HL = next block addr
+                DEC     BC
+                LD      A, B
+                OR      C
+                JR      NZ, balloc_init_loop
+
+                POP     HL
+                POP     DE
+                POP     BC
+                RET
+
+
+; mark the block as free
+; HL - block addr
+balloc_free:
+                PUSH    AF
+                PUSH    HL
+
+                DEC     HL
+                DEC     HL
+                LD      A, 1
+                OR      (HL)
+                LD      (HL), A
+                INC     HL
+                INC     HL
+
+                POP     HL
+                POP     AF
+                RET
