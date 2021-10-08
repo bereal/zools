@@ -10,6 +10,7 @@ import (
 type Sprite struct {
 	img      image.Image
 	inverted bool
+	flippedV bool
 }
 
 func ReadSprite(r io.Reader) (*Sprite, error) {
@@ -17,11 +18,15 @@ func ReadSprite(r io.Reader) (*Sprite, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Sprite{img, false}, nil
+	return &Sprite{img, false, false}, nil
 }
 
 func (s Sprite) Invert() Sprite {
-	return Sprite{s.img, !s.inverted}
+	return Sprite{s.img, !s.inverted, s.flippedV}
+}
+
+func (s Sprite) FlipV() Sprite {
+	return Sprite{s.img, s.inverted, !s.flippedV}
 }
 
 func (s Sprite) Encode(masked bool) []byte {
@@ -45,6 +50,16 @@ func (s Sprite) Encode(masked bool) []byte {
 				result = append(result, mask)
 			}
 			result = append(result, sprite)
+		}
+
+		if s.flippedV {
+			j := len(result) - 1
+			for i := 0; i < j; i++ {
+				t := result[i]
+				result[i] = result[j]
+				result[j] = t
+				j--
+			}
 		}
 		return result
 	}
@@ -88,7 +103,7 @@ func (s Sprite) pixelAt(x, y int) (byte, byte) {
 	return mask, sprite
 }
 
-func ReadSpriteSheet(r io.Reader, w, h int) ([]*Sprite, error) {
+func ReadSpriteSheet(r io.Reader, w, h int) ([]Sprite, error) {
 	img, format, err := image.Decode(r)
 	if err != nil {
 		return nil, err
@@ -102,7 +117,7 @@ func ReadSpriteSheet(r io.Reader, w, h int) ([]*Sprite, error) {
 		return nil, fmt.Errorf("format %s doesn't support sub images", format)
 	}
 
-	var sprites []*Sprite
+	var sprites []Sprite
 	size := img.Bounds()
 	maxX := (size.Max.X / w) * w
 	maxY := (size.Max.Y / h) * h
@@ -114,7 +129,7 @@ func ReadSpriteSheet(r io.Reader, w, h int) ([]*Sprite, error) {
 				image.Point{x + w, y + h},
 			}
 			si := sub.SubImage(r)
-			sprites = append(sprites, &Sprite{si, false})
+			sprites = append(sprites, Sprite{si, false, false})
 		}
 	}
 	return sprites, nil

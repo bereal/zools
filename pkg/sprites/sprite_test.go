@@ -83,6 +83,14 @@ func invert(b []byte) []byte {
 	return inv
 }
 
+func reversed(b []byte) []byte {
+	res := make([]byte, 0, len(b))
+	for i := len(b) - 1; i >= 0; i-- {
+		res = append(res, b[i])
+	}
+	return res
+}
+
 func TestSingleCellSpriteEncoding(t *testing.T) {
 	f, err := content.Open("test_data/test_sprite.png")
 	if !assert.NoError(t, err) {
@@ -108,14 +116,23 @@ func TestSingleCellSpriteEncoding(t *testing.T) {
 	assert.EqualValues(t, masked(invert(sprite1)), result)
 }
 
-func TestSpriteSheet8x16(t *testing.T) {
+func readSpriteSheet(w, h int) ([]sprites.Sprite, error) {
 	f, err := content.Open("test_data/test_spritesheet.png")
-	if !assert.NoError(t, err) {
-		return
+	if err != nil {
+		return nil, err
 	}
 	defer f.Close()
 
-	sprites, err := sprites.ReadSpriteSheet(f, 8, 16)
+	sprites, err := sprites.ReadSpriteSheet(f, w, h)
+	if err != nil {
+		return nil, err
+	}
+	return sprites, nil
+
+}
+
+func TestSpriteSheet8x16(t *testing.T) {
+	sprites, err := readSpriteSheet(8, 16)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -131,13 +148,7 @@ func TestSpriteSheet8x16(t *testing.T) {
 }
 
 func TestSpriteSheet16x8(t *testing.T) {
-	f, err := content.Open("test_data/test_spritesheet.png")
-	if !assert.NoError(t, err) {
-		return
-	}
-	defer f.Close()
-
-	sprites, err := sprites.ReadSpriteSheet(f, 16, 8)
+	sprites, err := readSpriteSheet(16, 8)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -145,4 +156,15 @@ func TestSpriteSheet16x8(t *testing.T) {
 	assert.Len(t, sprites, 2)
 	assert.EqualValues(t, concat(sprite1, sprite2), sprites[0].Encode(false))
 	assert.EqualValues(t, concat(sprite3, sprite4), sprites[1].Encode(false))
+}
+
+func TestSpriteSheet8x16UpsideDown(t *testing.T) {
+	sprites, err := readSpriteSheet(8, 16)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Len(t, sprites, 2)
+	assert.EqualValues(t, reversed(concat(sprite1, sprite3)), sprites[0].FlipV().Encode(false))
+	assert.EqualValues(t, reversed(concat(sprite2, sprite4)), sprites[1].FlipV().Encode(false))
 }
