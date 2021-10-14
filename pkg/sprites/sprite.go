@@ -29,23 +29,13 @@ func (s Sprite) FlipV() Sprite {
 	return Sprite{s.img, s.inverted, !s.flippedV}
 }
 
-func (s Sprite) Encode(masked bool) []byte {
+func (s Sprite) EncodeByColumns(masked bool) []byte {
 	size := s.img.Bounds().Size()
-
-	encodeChunk := func(col int, row int) (byte, byte) {
-		var mask, sprite byte
-		for i := col; i < col+8; i++ {
-			m, s := s.pixelAt(i, row)
-			mask = (mask << 1) + m
-			sprite = (sprite << 1) + s
-		}
-		return mask, sprite
-	}
 
 	encodeColumn := func(col int) []byte {
 		var result []byte
 		for row := 0; row < size.Y; row++ {
-			mask, sprite := encodeChunk(col, row)
+			mask, sprite := s.encodeChunk(col, row)
 			if masked {
 				result = append(result, mask)
 			}
@@ -55,9 +45,7 @@ func (s Sprite) Encode(masked bool) []byte {
 		if s.flippedV {
 			j := len(result) - 1
 			for i := 0; i < j; i++ {
-				t := result[i]
-				result[i] = result[j]
-				result[j] = t
+				result[i], result[j] = result[j], result[i]
 				j--
 			}
 		}
@@ -71,6 +59,52 @@ func (s Sprite) Encode(masked bool) []byte {
 	}
 
 	return encoded
+}
+
+func (s Sprite) EncodeByRows(masked bool) []byte {
+	size := s.img.Bounds().Size()
+
+	width := (size.X / 8) * 8
+	encodeRow := func(row int) []byte {
+		var result []byte
+		for col := 0; col < width; col += 8 {
+			mask, sprite := s.encodeChunk(col, row)
+			if masked {
+				result = append(result, mask)
+			}
+			result = append(result, sprite)
+		}
+		return result
+	}
+
+	var rows [][]byte
+	for row := 0; row < size.Y; row++ {
+		rows = append(rows, encodeRow(row))
+	}
+
+	if s.flippedV {
+		j := len(rows) - 1
+		for i := 0; i < j; i++ {
+			rows[i], rows[j] = rows[j], rows[i]
+			j--
+		}
+	}
+	var encoded []byte
+	for _, row := range rows {
+		encoded = append(encoded, row...)
+	}
+
+	return encoded
+}
+
+func (s Sprite) encodeChunk(col, row int) (byte, byte) {
+	var mask, sprite byte
+	for i := col; i < col+8; i++ {
+		m, s := s.pixelAt(i, row)
+		mask = (mask << 1) + m
+		sprite = (sprite << 1) + s
+	}
+	return mask, sprite
 }
 
 func (s Sprite) heightInPx() int {

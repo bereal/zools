@@ -52,6 +52,16 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 	flipV, _ := cmd.Flags().GetBool("flip-vertical")
 	invert, _ := cmd.Flags().GetBool("invert")
 	masked, _ := cmd.Flags().GetBool("masked")
+	direction, _ := cmd.Flags().GetString("direction")
+
+	var encode func(s sprites.Sprite) []byte
+	if direction == "rows" {
+		encode = func(s sprites.Sprite) []byte { return s.EncodeByColumns(masked) }
+	} else if direction == "columns" {
+		encode = func(s sprites.Sprite) []byte { return s.EncodeByRows(masked) }
+	} else {
+		log.Fatalf("Invalid direction: %s", direction)
+	}
 
 	f, err := os.Open(args[0])
 	check(err)
@@ -72,8 +82,7 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 		if invert {
 			s = s.Invert()
 		}
-		encoded := s.Encode(masked)
-		_, err := out.Write(encoded)
+		_, err := out.Write(encode(s))
 		check(err)
 	}
 }
@@ -102,6 +111,7 @@ func main() {
 	encodeSpriteCmd.Flags().BoolP("invert", "", false, "")
 	encodeSpriteCmd.Flags().StringP("size", "s", "16x16", "Size WxH")
 	encodeSpriteCmd.Flags().BoolP("masked", "m", false, "")
+	encodeSpriteCmd.Flags().StringP("direction", "d", "rows", "encoding direction")
 
 	cmd.AddCommand(packFontCmd, encodeSpriteCmd)
 

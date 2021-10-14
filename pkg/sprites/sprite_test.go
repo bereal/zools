@@ -67,6 +67,14 @@ func interleave(a, b []byte) []byte {
 
 func masked(sprite []byte) []byte { return interleave(mask, sprite) }
 
+func interleaveMasked(a, b []byte) []byte {
+	var c []byte
+	for i := 0; i < len(a); i += 2 {
+		c = append(c, a[i], a[i+1], b[i], b[i+1])
+	}
+	return c
+}
+
 func concat(s ...[]byte) []byte {
 	v := []byte{}
 	for _, b := range s {
@@ -103,16 +111,16 @@ func TestSingleCellSpriteEncoding(t *testing.T) {
 		return
 	}
 
-	result := sprite.Encode(false)
+	result := sprite.EncodeByColumns(false)
 	assert.EqualValues(t, sprite1, result)
 
-	result = sprite.Encode(true)
+	result = sprite.EncodeByColumns(true)
 	assert.EqualValues(t, masked(sprite1), result)
 
-	result = sprite.Invert().Encode(false)
+	result = sprite.Invert().EncodeByColumns(false)
 	assert.EqualValues(t, invert(sprite1), result)
 
-	result = sprite.Invert().Encode(true)
+	result = sprite.Invert().EncodeByColumns(true)
 	assert.EqualValues(t, masked(invert(sprite1)), result)
 }
 
@@ -131,7 +139,7 @@ func readSpriteSheet(w, h int) ([]sprites.Sprite, error) {
 
 }
 
-func TestSpriteSheet8x16(t *testing.T) {
+func TestSpriteSheet8x16ByCol(t *testing.T) {
 	sprites, err := readSpriteSheet(8, 16)
 	if !assert.NoError(t, err) {
 		return
@@ -139,32 +147,57 @@ func TestSpriteSheet8x16(t *testing.T) {
 
 	assert.Len(t, sprites, 2)
 
-	assert.EqualValues(t, concat(sprite1, sprite3), sprites[0].Encode(false))
-	assert.EqualValues(t, concat(sprite2, sprite4), sprites[1].Encode(false))
-	assert.EqualValues(t, concat(masked(sprite1), masked(sprite3)), sprites[0].Encode(true))
-	assert.EqualValues(t, concat(masked(sprite2), masked(sprite4)), sprites[1].Encode(true))
+	assert.EqualValues(t, concat(sprite1, sprite3), sprites[0].EncodeByColumns(false))
+	assert.EqualValues(t, concat(sprite2, sprite4), sprites[1].EncodeByColumns(false))
+	assert.EqualValues(t, concat(masked(sprite1), masked(sprite3)), sprites[0].EncodeByColumns(true))
+	assert.EqualValues(t, concat(masked(sprite2), masked(sprite4)), sprites[1].EncodeByColumns(true))
 
-	assert.EqualValues(t, concat(invert(sprite1), invert(sprite3)), sprites[0].Invert().Encode(false))
+	assert.EqualValues(t, concat(invert(sprite1), invert(sprite3)), sprites[0].Invert().EncodeByColumns(false))
 }
 
-func TestSpriteSheet16x8(t *testing.T) {
+func TestSpriteSheet16x8ByCol(t *testing.T) {
 	sprites, err := readSpriteSheet(16, 8)
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	assert.Len(t, sprites, 2)
-	assert.EqualValues(t, concat(sprite1, sprite2), sprites[0].Encode(false))
-	assert.EqualValues(t, concat(sprite3, sprite4), sprites[1].Encode(false))
+	assert.EqualValues(t, concat(sprite1, sprite2), sprites[0].EncodeByColumns(false))
+	assert.EqualValues(t, concat(sprite3, sprite4), sprites[1].EncodeByColumns(false))
 }
 
-func TestSpriteSheet8x16UpsideDown(t *testing.T) {
+func TestSpriteSheet8x16UpsideDownByCol(t *testing.T) {
 	sprites, err := readSpriteSheet(8, 16)
 	if !assert.NoError(t, err) {
 		return
 	}
 
 	assert.Len(t, sprites, 2)
-	assert.EqualValues(t, reversed(concat(sprite1, sprite3)), sprites[0].FlipV().Encode(false))
-	assert.EqualValues(t, reversed(concat(sprite2, sprite4)), sprites[1].FlipV().Encode(false))
+	assert.EqualValues(t, reversed(concat(sprite1, sprite3)), sprites[0].FlipV().EncodeByColumns(false))
+	assert.EqualValues(t, reversed(concat(sprite2, sprite4)), sprites[1].FlipV().EncodeByColumns(false))
+}
+
+func TestSpriteSheet8x16ByRow(t *testing.T) {
+	sprites, err := readSpriteSheet(8, 16)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.EqualValues(t, concat(sprite1, sprite3), sprites[0].EncodeByRows(false))
+	assert.EqualValues(t, concat(sprite2, sprite4), sprites[1].EncodeByRows(false))
+	assert.EqualValues(t, concat(masked(sprite1), masked(sprite3)), sprites[0].EncodeByRows(true))
+	assert.EqualValues(t, concat(masked(sprite2), masked(sprite4)), sprites[1].EncodeByRows(true))
+}
+
+func TestSpriteSheet16x8ByRow(t *testing.T) {
+	sprites, err := readSpriteSheet(16, 8)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.EqualValues(t, interleave(sprite1, sprite2), sprites[0].EncodeByRows(false))
+	assert.EqualValues(t, interleave(sprite3, sprite4), sprites[1].EncodeByRows(false))
+	assert.EqualValues(t, interleaveMasked(masked(sprite1), masked(sprite2)), sprites[0].EncodeByRows(true))
+	assert.EqualValues(t, interleaveMasked(masked(sprite3), masked(sprite4)), sprites[1].EncodeByRows(true))
+
 }
