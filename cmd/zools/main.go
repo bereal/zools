@@ -59,6 +59,8 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByColumns(masked) }
 	} else if direction == "columns" {
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByRows(masked) }
+	} else if direction == "zigzag" {
+		encode = func(s sprites.Sprite) []byte { return s.EncodeZigZag(masked) }
 	} else {
 		log.Fatalf("Invalid direction: %s", direction)
 	}

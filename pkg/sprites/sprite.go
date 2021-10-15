@@ -43,11 +43,7 @@ func (s Sprite) EncodeByColumns(masked bool) []byte {
 		}
 
 		if s.flippedV {
-			j := len(result) - 1
-			for i := 0; i < j; i++ {
-				result[i], result[j] = result[j], result[i]
-				j--
-			}
+			reverseBytes(result)
 		}
 		return result
 	}
@@ -62,6 +58,33 @@ func (s Sprite) EncodeByColumns(masked bool) []byte {
 }
 
 func (s Sprite) EncodeByRows(masked bool) []byte {
+	rows := s.encodeRows(masked)
+	var encoded []byte
+	for _, row := range rows {
+		encoded = append(encoded, row...)
+	}
+
+	return encoded
+}
+
+func (s Sprite) EncodeZigZag(masked bool) []byte {
+	var encoded []byte
+	rows := s.encodeRows(masked)
+	chunkSize := 1
+	if masked {
+		chunkSize = 2
+	}
+	for i, row := range rows {
+		if i&1 == 1 {
+			reverseChunks(row, chunkSize)
+		}
+		encoded = append(encoded, row...)
+	}
+
+	return encoded
+}
+
+func (s Sprite) encodeRows(masked bool) [][]byte {
 	size := s.img.Bounds().Size()
 
 	width := (size.X / 8) * 8
@@ -83,18 +106,9 @@ func (s Sprite) EncodeByRows(masked bool) []byte {
 	}
 
 	if s.flippedV {
-		j := len(rows) - 1
-		for i := 0; i < j; i++ {
-			rows[i], rows[j] = rows[j], rows[i]
-			j--
-		}
+		reverseSlices(rows)
 	}
-	var encoded []byte
-	for _, row := range rows {
-		encoded = append(encoded, row...)
-	}
-
-	return encoded
+	return rows
 }
 
 func (s Sprite) encodeChunk(col, row int) (byte, byte) {
@@ -167,4 +181,30 @@ func ReadSpriteSheet(r io.Reader, w, h int) ([]Sprite, error) {
 		}
 	}
 	return sprites, nil
+}
+
+func reverseBytes(d []byte) {
+	j := len(d) - 1
+	for i := 0; i < j; i++ {
+		d[i], d[j] = d[j], d[i]
+		j--
+	}
+}
+
+func reverseSlices(d [][]byte) {
+	j := len(d) - 1
+	for i := 0; i < j; i++ {
+		d[i], d[j] = d[j], d[i]
+		j--
+	}
+}
+
+func reverseChunks(d []byte, chunkSize int) {
+	j := len(d) - chunkSize
+	for i := 0; i < j; i += chunkSize {
+		for k := 0; k < chunkSize; k++ {
+			d[i+k], d[j+k] = d[j+k], d[i+k]
+		}
+		j -= chunkSize
+	}
 }

@@ -60,6 +60,9 @@ var mask = []byte{0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff}
 func interleave(a, b []byte) []byte {
 	var c []byte
 	for i, v := range a {
+		if i >= len(b) {
+			break
+		}
 		c = append(c, v, b[i])
 	}
 	return c
@@ -200,4 +203,15 @@ func TestSpriteSheet16x8ByRow(t *testing.T) {
 	assert.EqualValues(t, interleaveMasked(masked(sprite1), masked(sprite2)), sprites[0].EncodeByRows(true))
 	assert.EqualValues(t, interleaveMasked(masked(sprite3), masked(sprite4)), sprites[1].EncodeByRows(true))
 
+}
+
+func TestSpriteSheet16x8ZigZag(t *testing.T) {
+	sprites, err := readSpriteSheet(16, 8)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	encoded := sprites[0].EncodeZigZag(true)
+	expected := concat(masked(sprite1)[:2], masked(sprite2)[:4], masked(sprite1)[2:4])
+	assert.EqualValues(t, expected, encoded[:8])
 }
