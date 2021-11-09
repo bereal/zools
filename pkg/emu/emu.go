@@ -3,59 +3,68 @@ package emu
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"path"
+	"image"
 
+	"github.com/bereal/zools/pkg/asm"
 	"github.com/koron-go/z80"
 )
 
-func Sjasmplus(code string, include []string) ([]byte, error) {
-	asmpath, err := exec.LookPath("sjasmplus")
-	if err != nil {
-		return nil, err
-	}
-
-	tempdir, err := ioutil.TempDir(os.TempDir(), "code_*")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tempdir)
-
-	p := path.Join(tempdir, "code.z80")
-	ioutil.WriteFile(p, []byte(code), 0600)
-
-	args := []string{"sjasmplus", "code.z80", "--raw=-"}
-	for _, i := range include {
-		args = append(args, fmt.Sprintf("-I%s", i))
-	}
-
-	cmd := exec.Cmd{
-		Path: asmpath,
-		Args: args,
-		Dir:  tempdir,
-	}
-	result, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+type Speccy struct {
+	CPU *z80.CPU
 }
 
-func Run(code string, include []string, addr uint16) (*z80.CPU, error) {
-	mem := z80.DumbMemory(make([]byte, 0x10000))
-	bin, err := Sjasmplus(code, include)
+func NewSpeccy() *Speccy {
+	memory := z80.DumbMemory(make([]byte, 0x10000))
+	return &Speccy{&z80.CPU{Memory: memory}}
+}
 
+func (s *Speccy) DumpScreen(addr uint16) image.Image {
+	return DumpScreen(s.CPU.Memory, addr)
+}
+
+func (s *Speccy) ClearScreen() {
+	ClearScreen(s.CPU.Memory, 0x4000, GetScreenAttr(White, Black, false))
+}
+
+func (s *Speccy) Load(addr uint16, data []byte) {
+	for _, b := range data {
+		s.CPU.Memory.Set(addr, b)
+		addr++
+	}
+}
+
+func (s *Speccy) DumpState() {
+	fmt.Printf(`AF=%04x
+BC=%04x
+DE=%04x
+HL=%04x
+`, s.CPU.AF.U16(), s.CPU.BC.U16(), s.CPU.DE.U16(), s.CPU.HL.U16())
+}
+
+func (s *Speccy) Run(addr uint16) error {
+	s.CPU.PC = addr
+	return s.CPU.Run(context.Background())
+}
+
+func CompileAndRun(code string, include []string, addr uint16) (*Speccy, error) {
+	sj := asm.NewSjasmplus()
+	if len(include) > 0 {
+		sj.AddInclude(include...)
+	}
+	d, err := sj.Compile(code)
 	if err != nil {
 		return nil, err
 	}
-	mem.Put(addr, bin...)
-	cpu := &z80.CPU{Memory: mem}
-	cpu.PC = addr
-	if err = cpu.Run(context.Background()); err != nil {
+
+	println(len(d))
+
+	s := NewSpeccy()
+	s.ClearScreen()
+
+	s.Load(addr, d)
+	if err = s.Run(addr); err != nil {
 		return nil, err
 	}
 
-	return cpu, nil
+	return s, nil
 }

@@ -7,6 +7,40 @@ import (
 	"github.com/koron-go/z80"
 )
 
+type ZXColor uint8
+
+const (
+	Black   ZXColor = iota
+	Green   ZXColor = 4
+	Red     ZXColor = 2
+	Blue    ZXColor = 1
+	Magenta ZXColor = Red & Blue
+	Cyan    ZXColor = Green & Blue
+	Yellow  ZXColor = Red & Green
+	White   ZXColor = 7
+)
+
+func GetScreenAttr(paper, ink ZXColor, bright bool) uint8 {
+	attr := uint8((paper << 3) | ink)
+	if bright {
+		attr &= 0x40
+	}
+
+	return attr
+}
+
+func ClearScreen(mem z80.Memory, addr uint16, attrs uint8) {
+	var i uint16
+	for i = 0; i < 0x1800; i++ {
+		mem.Set(addr, 0)
+		addr++
+	}
+	for i = 0; i < 0x300; i++ {
+		mem.Set(addr, attrs)
+		addr++
+	}
+}
+
 func ScreenAttrToColors(attrs uint8) (paper color.RGBA, ink color.RGBA) {
 	var colValue uint8
 	if attrs&0x40 == 0 {
@@ -88,8 +122,8 @@ func ImagesEqual(i1, i2 image.Image) bool {
 	min1 := b1.Min
 	min2 := b2.Min
 
-	for x := 0; x <= b1.Dx(); x++ {
-		for y := 0; y <= b1.Dy(); y++ {
+	for x := 0; x < b1.Dx(); x++ {
+		for y := 0; y < b1.Dy(); y++ {
 			c1 := i1.At(min1.X+x, min1.Y+y)
 			c2 := i2.At(min2.X+x, min2.Y+y)
 			r1, g1, b1, a1 := c1.RGBA()
