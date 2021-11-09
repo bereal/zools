@@ -1,0 +1,109 @@
+
+    ; sprites are encoded with left-to right first zigzag method
+
+        MACRO   sprite_put_octet_with_mask
+                POP     DE
+                LD      A, (HL)
+                AND     E
+                OR      D
+                LD      (HL), A
+.ok
+        ENDM
+
+    ; After INC H, adjust the address to account for a possible cell change
+        MACRO   adjust_cell_row
+                LD      A, L
+                ADD     A, 0x20
+                LD      L, A
+                JR      C, $+6
+                LD      A, H
+                SUB     8
+                LD      H, A
+        ENDM
+
+        MACRO   sprite_put_chunk_24
+.loop
+                sprite_put_octet_with_mask
+                INC     L
+                sprite_put_octet_with_mask
+                INC     L
+                sprite_put_octet_with_mask
+
+                INC     H
+
+                sprite_put_octet_with_mask
+                DEC     L
+                sprite_put_octet_with_mask
+                DEC     L
+                sprite_put_octet_with_mask
+
+                INC     H
+
+                DJNZ    .loop
+        ENDM
+
+        MACRO   sprite_put_chunk_16
+.loop
+                sprite_put_octet_with_mask
+                INC     L
+                sprite_put_octet_with_mask
+                INC     H
+
+                sprite_put_octet_with_mask
+                DEC     L
+                sprite_put_octet_with_mask
+                INC     H
+
+                DJNZ    .loop
+        ENDM
+
+
+
+; DE - cell screen address
+; HL - pre-rotated masked sprite address
+; B - first cell heigth in 2-pixel
+; C - height in cells (rounded up)
+put_sprite_width_24:
+                LD      (put_sprite_width_24_next_chunk_done+1), SP
+                LD      SP, HL
+                EX      DE, HL
+
+put_sprite_width_24_next_chunk:
+                sprite_put_chunk_24
+
+                DEC     C
+                JR      NZ, put_sprite_width_24_next_chunk_done
+
+                LD      B, 4
+                JR      put_sprite_width_24_next_chunk
+
+put_sprite_width_24_next_chunk_done:
+                LD      SP, 0
+                RET
+
+
+
+
+put_sprite_width_16:
+                LD      (put_sprite_width_16_done+1), SP
+                LD      SP, HL
+                EX      DE, HL
+
+put_sprite_width_16_next_chunk:
+                sprite_put_chunk_16
+                adjust_cell_row
+
+                DEC     C
+                JR      Z, put_sprite_width_16_done
+
+                LD      B, 4
+                JR      put_sprite_width_16_next_chunk
+
+put_sprite_width_16_done:
+                LD      SP, 0
+                RET
+
+
+
+
+
