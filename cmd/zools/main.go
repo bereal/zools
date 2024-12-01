@@ -12,8 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func check(err error) {
+func check(err error, args ...string) {
 	if err != nil {
+		if len(args) > 0 {
+			log.Fatalf("%w (%+v)", err, args)
+		}
 		log.Fatal(err)
 	}
 }
@@ -56,9 +59,9 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 
 	var encode func(s sprites.Sprite) []byte
 	if direction == "rows" {
-		encode = func(s sprites.Sprite) []byte { return s.EncodeByColumns(masked) }
-	} else if direction == "columns" {
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByRows(masked) }
+	} else if direction == "columns" {
+		encode = func(s sprites.Sprite) []byte { return s.EncodeByColumns(masked) }
 	} else if direction == "zigzag" {
 		encode = func(s sprites.Sprite) []byte { return s.EncodeZigZag(masked) }
 	} else {
@@ -66,7 +69,7 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 	}
 
 	f, err := os.Open(args[0])
-	check(err)
+	check(err, args...)
 
 	size, _ := cmd.Flags().GetString("size")
 	w, h := parseSize(size)
