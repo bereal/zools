@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/bereal/zools/pkg/fonts"
 	"github.com/bereal/zools/pkg/sprites"
@@ -50,6 +52,30 @@ func parseSize(s string) (w int, h int) {
 	return
 }
 
+func splitSpritesheet(cmd *cobra.Command, args []string) {
+	output := cmd.Flags().Lookup("output").Value.String()
+	if output == "" {
+		basename := strings.TrimSuffix(args[0], path.Ext(args[0]))
+		output = basename + "-%d.png"
+	}
+	size, _ := cmd.Flags().GetString("size")
+	w, h := parseSize(size)
+
+	f, err := os.Open(args[0])
+	check(err, args...)
+
+	sprites, err := sprites.ReadSpriteSheet(f, w, h)
+	check(err)
+
+	for i, s := range sprites {
+		outputName := fmt.Sprintf(output, i)
+		out, err := os.OpenFile(outputName, os.O_CREATE|os.O_RDWR, 0644)
+		check(err)
+		check(s.EncodePNG(out))
+		defer out.Close()
+	}
+}
+
 func encodeSprite(cmd *cobra.Command, args []string) {
 	output := cmd.Flags().Lookup("output").Value.String()
 	flipV, _ := cmd.Flags().GetBool("flip-vertical")
@@ -58,13 +84,16 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 	direction, _ := cmd.Flags().GetString("direction")
 
 	var encode func(s sprites.Sprite) []byte
-	if direction == "rows" {
+	switch direction {
+	case "rows":
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByRows(masked) }
-	} else if direction == "columns" {
+	case "columns":
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByColumns(masked) }
-	} else if direction == "zigzag" {
+	case "zigzag":
 		encode = func(s sprites.Sprite) []byte { return s.EncodeZigZag(masked) }
-	} else {
+	case "cell":
+		encode = func(s sprites.Sprite) []byte { return s.EncodeByCell(masked) }
+	default:
 		log.Fatalf("Invalid direction: %s", direction)
 	}
 
@@ -118,7 +147,16 @@ func main() {
 	encodeSpriteCmd.Flags().BoolP("masked", "m", false, "")
 	encodeSpriteCmd.Flags().StringP("direction", "d", "rows", "encoding direction")
 
-	cmd.AddCommand(packFontCmd, encodeSpriteCmd)
+	splitSpritesheet := &cobra.Command{
+		Use:  "split-spritesheet file1",
+		Run:  splitSpritesheet,
+		Args: cobra.ExactArgs(1),
+	}
+
+	splitSpritesheet.Flags().StringP("output", "o", "", "")
+	splitSpritesheet.Flags().StringP("size", "s", "16x16", "Size WxH")
+
+	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitSpritesheet)
 
 	err := cmd.Execute()
 	if err != nil {

@@ -21,6 +21,22 @@ func ReadSprite(r io.Reader) (*Sprite, error) {
 	return &Sprite{img, false, false}, nil
 }
 
+func (s Sprite) Split(w, h int) []Sprite {
+	sprites := make([]Sprite, 0)
+
+	bounds := s.img.Bounds().Size()
+	for ix := 0; ix < bounds.X; ix += w {
+		for iy := 0; iy < bounds.Y; iy += h {
+			r := image.Rect(ix, iy, ix+w, iy+h)
+			sub := s.img.(*image.RGBA).SubImage(r)
+			sprite := Sprite{sub, s.inverted, s.flippedV}
+			sprites = append(sprites, sprite)
+		}
+	}
+
+	return sprites
+}
+
 func (s Sprite) Invert() Sprite {
 	return Sprite{s.img, !s.inverted, s.flippedV}
 }
@@ -57,6 +73,31 @@ func (s Sprite) EncodeByColumns(masked bool) []byte {
 	return encoded
 }
 
+func (s Sprite) EncodeByCell(masked bool) []byte {
+	size := s.img.Bounds().Size()
+
+	encodeCell := func(col, row int) []byte {
+		var result []byte
+		for i := 0; i < 8; i++ {
+			mask, sprite := s.encodeChunk(col, row+i)
+			if masked {
+				result = append(result, mask)
+			}
+			result = append(result, sprite)
+		}
+		return result
+	}
+
+	var encoded []byte
+	for x := 0; x < size.X; x += 8 {
+		for y := 0; y < size.Y; y += 8 {
+			encoded = append(encoded, encodeCell(x, y)...)
+		}
+	}
+
+	return encoded
+}
+
 func (s Sprite) EncodeByRows(masked bool) []byte {
 	rows := s.encodeRows(masked)
 	var encoded []byte
@@ -82,6 +123,10 @@ func (s Sprite) EncodeZigZag(masked bool) []byte {
 	}
 
 	return encoded
+}
+
+func (s Sprite) EncodePNG(w io.Writer) error {
+	return png.Encode(w, s.img)
 }
 
 func (s Sprite) encodeRows(masked bool) [][]byte {

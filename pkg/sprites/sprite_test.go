@@ -205,6 +205,17 @@ func TestSpriteSheet16x8ByRow(t *testing.T) {
 
 }
 
+func TestSpriteSheet16x8ByCell(t *testing.T) {
+	sprites, err := readSpriteSheet(16, 8)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Len(t, sprites, 2)
+	assert.EqualValues(t, concat(sprite1, sprite2), sprites[0].EncodeByCell(false))
+	assert.EqualValues(t, concat(sprite3, sprite4), sprites[1].EncodeByCell(false))
+}
+
 func TestSpriteSheet16x8ZigZag(t *testing.T) {
 	sprites, err := readSpriteSheet(16, 8)
 	if !assert.NoError(t, err) {
