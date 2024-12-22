@@ -34,7 +34,6 @@ func deduplicateImages(imgs []image.Image) []image.Image {
 		key := hex.EncodeToString(h.Sum(nil))
 		if _, ok := unique[key]; !ok {
 			deduped = append(deduped, img)
-			println(key, len(unique))
 			unique[key] = struct{}{}
 		}
 	}

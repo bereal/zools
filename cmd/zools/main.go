@@ -6,10 +6,12 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/bereal/zools/pkg/fonts"
+	"github.com/bereal/zools/pkg/maps"
 	"github.com/bereal/zools/pkg/sprites"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +19,7 @@ import (
 func check(err error, args ...string) {
 	if err != nil {
 		if len(args) > 0 {
-			log.Fatalf("%w (%+v)", err, args)
+			log.Fatalf("%s (%+v)", err.Error(), args)
 		}
 		log.Fatal(err)
 	}
@@ -42,7 +44,7 @@ func packFont(cmd *cobra.Command, args []string) {
 }
 
 func parseSize(s string) (w int, h int) {
-	re := regexp.MustCompile("^(\\d+)+x(\\d+)$")
+	re := regexp.MustCompile(`^(\d+)+x(\d+)$`)
 	parts := re.FindStringSubmatch(s)
 	if len(parts) == 0 {
 		log.Fatalf("Incorrect size format: %s", s)
@@ -52,7 +54,7 @@ func parseSize(s string) (w int, h int) {
 	return
 }
 
-func splitSpritesheet(cmd *cobra.Command, args []string) {
+func splitTileset(cmd *cobra.Command, args []string) {
 	output := cmd.Flags().Lookup("output").Value.String()
 	if output == "" {
 		basename := strings.TrimSuffix(args[0], path.Ext(args[0]))
@@ -61,13 +63,10 @@ func splitSpritesheet(cmd *cobra.Command, args []string) {
 	size, _ := cmd.Flags().GetString("size")
 	w, h := parseSize(size)
 
-	f, err := os.Open(args[0])
-	check(err, args...)
-
-	sprites, err := sprites.ReadSpriteSheet(f, w, h)
+	tileset, err := sprites.ReadTilePNG(args[0])
 	check(err)
 
-	for i, s := range sprites {
+	for i, s := range tileset.Split(w, h) {
 		outputName := fmt.Sprintf(output, i)
 		out, err := os.OpenFile(outputName, os.O_CREATE|os.O_RDWR, 0644)
 		check(err)
@@ -82,6 +81,7 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 	invert, _ := cmd.Flags().GetBool("invert")
 	masked, _ := cmd.Flags().GetBool("masked")
 	direction, _ := cmd.Flags().GetString("direction")
+	encoding, _ := cmd.Flags().GetString("encoding")
 
 	var encode func(s sprites.Sprite) []byte
 	switch direction {
@@ -97,26 +97,135 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 		log.Fatalf("Invalid direction: %s", direction)
 	}
 
-	f, err := os.Open(args[0])
-	check(err, args...)
-
-	size, _ := cmd.Flags().GetString("size")
-	w, h := parseSize(size)
-	sprites, err := sprites.ReadSpriteSheet(f, w, h)
+	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
 	check(err)
+	defer out.Close()
+
+	sort.Strings(args)
+	for i, arg := range args {
+		fmt.Printf("Processing %s\n", arg)
+		f, err := os.Open(arg)
+		check(err, args...)
+
+		size, _ := cmd.Flags().GetString("size")
+		w, h := parseSize(size)
+		sprites, err := sprites.ReadSpriteSheet(f, w, h)
+		check(err)
+		check(f.Close())
+		for j, s := range sprites {
+			if flipV {
+				s = s.FlipV()
+			}
+			if invert {
+				s = s.Invert()
+			}
+
+			data := encode(s)
+			switch encoding {
+			case "binary":
+				_, err := out.Write(encode(s))
+				check(err)
+			case "asm":
+				// TODO use the asm package when it's ready
+				label := fmt.Sprintf("tile_%d", i)
+				if len(sprites) > 1 {
+					label += fmt.Sprintf("_%d", j)
+				}
+				_, err = fmt.Fprintf(out, "%s:\n", label)
+				check(err)
+				for offs := 0; offs < len(data); offs += 8 {
+					chunk := data[offs : offs+8]
+					db := make([]string, len(chunk))
+					for i, b := range chunk {
+						db[i] = fmt.Sprintf("0x%02x", b)
+					}
+					_, err = fmt.Fprintf(out, "\tdb %s\n", strings.Join(db, ", "))
+					check(err)
+				}
+			}
+		}
+	}
+}
+
+func encodeTile(cmd *cobra.Command, args []string) {
+	output := cmd.Flags().Lookup("output").Value.String()
+	encoding, _ := cmd.Flags().GetString("encoding")
+	if encoding != "asm" && encoding != "binary" {
+		log.Fatalf("Invalid encoding: %s", encoding)
+	}
 
 	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
 	check(err)
 	defer out.Close()
 
-	for _, s := range sprites {
-		if flipV {
-			s = s.FlipV()
+	var tiles []*sprites.Tile
+
+	for _, arg := range args {
+		ext := path.Ext(arg)
+		switch ext {
+		case ".png":
+			tile, err := sprites.ReadTilePNG(arg)
+			check(err)
+			tiles = append(tiles, tile)
+		case ".tsx":
+			tileset, err := sprites.ReadTSX(arg)
+			check(err)
+			tiles = append(tiles, tileset...)
+		default:
+			log.Fatalf("Unknown tileset file extension: %s", ext)
 		}
-		if invert {
-			s = s.Invert()
+	}
+
+	if encoding == "asm" {
+		fmt.Fprintln(out, "tiles_table:\n\tdw empty_tile")
+		for _, tile := range tiles {
+			_, err = fmt.Fprintf(out, "\tdw %s\n", tile.Name)
+			check(err)
 		}
-		_, err := out.Write(encode(s))
+		fmt.Fprintf(out, "empty_tile:\t.12 db 0\n")
+	}
+	for _, tile := range tiles {
+		switch encoding {
+		case "binary":
+			_, err = out.Write(tile.EncodeBinary(0))
+			check(err)
+		case "asm":
+			code := tile.EncodeAsm(0)
+			_, err = out.WriteString(strings.Join(code, "\n") + "\n")
+			check(err)
+		}
+	}
+}
+
+func encodeMap(cmd *cobra.Command, args []string) {
+	output := cmd.Flags().Lookup("output").Value.String()
+	encoding, _ := cmd.Flags().GetString("encoding")
+	if encoding != "asm" && encoding != "binary" {
+		log.Fatalf("Invalid encoding: %s", encoding)
+	}
+
+	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
+	check(err)
+	defer out.Close()
+
+	var m maps.Map
+
+	ext := path.Ext(args[0])
+	switch ext {
+	case ".tmx":
+		m, err = maps.ReadTMX(args[0])
+		check(err)
+	default:
+		log.Fatalf("Unknown map file extension: %s", ext)
+	}
+
+	switch encoding {
+	case "binary":
+		_, err = out.Write(m.EncodeBinary())
+		check(err)
+	case "asm":
+		code := m.EncodeAsm()
+		_, err = out.WriteString(strings.Join(code, "\n") + "\n")
 		check(err)
 	}
 }
@@ -135,9 +244,9 @@ func main() {
 	packFontCmd.Flags().StringP("output", "o", "", "")
 
 	encodeSpriteCmd := &cobra.Command{
-		Use:  "encode-sprite file1",
+		Use:  "encode-sprite [files]",
 		Run:  encodeSprite,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 	}
 
 	encodeSpriteCmd.Flags().StringP("output", "o", "", "")
@@ -146,17 +255,34 @@ func main() {
 	encodeSpriteCmd.Flags().StringP("size", "s", "16x16", "Size WxH")
 	encodeSpriteCmd.Flags().BoolP("masked", "m", false, "")
 	encodeSpriteCmd.Flags().StringP("direction", "d", "rows", "encoding direction")
+	encodeSpriteCmd.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
 
-	splitSpritesheet := &cobra.Command{
-		Use:  "split-spritesheet file1",
-		Run:  splitSpritesheet,
+	splitTile := &cobra.Command{
+		Use:  "split-tile file1",
+		Run:  splitTileset,
 		Args: cobra.ExactArgs(1),
 	}
 
-	splitSpritesheet.Flags().StringP("output", "o", "", "")
-	splitSpritesheet.Flags().StringP("size", "s", "16x16", "Size WxH")
+	splitTile.Flags().StringP("output", "o", "", "")
+	splitTile.Flags().StringP("size", "s", "16x16", "Size WxH")
 
-	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitSpritesheet)
+	encodeTiles := &cobra.Command{
+		Use:  "encode-tiles file",
+		Run:  encodeTile,
+		Args: cobra.MinimumNArgs(1),
+	}
+	encodeTiles.Flags().StringP("output", "o", "", "")
+	encodeTiles.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
+
+	encodeMap := &cobra.Command{
+		Use:  "encode-map file",
+		Run:  encodeMap,
+		Args: cobra.ExactArgs(1),
+	}
+	encodeMap.Flags().StringP("output", "o", "", "")
+	encodeMap.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
+
+	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap)
 
 	err := cmd.Execute()
 	if err != nil {

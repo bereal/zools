@@ -28,13 +28,7 @@ func parseRGB(s string) (res color.NRGBA) {
 }
 
 func RGBtoZX(col color.Color) (res ZXAttr) {
-	// rgba := color.NRGBAModel.Convert(col).(color.NRGBA)
-	defer func() {
-		fmt.Printf("Converted %T %v to %v\n", col, col, res)
-	}()
-
 	idx := rgbPalette.Index(col)
-	fmt.Printf("Index: %d\n", idx)
 	if idx < 8 {
 		return ZXAttr(idx)
 	}
@@ -67,5 +61,4 @@ func init() {
 	for _, s := range rgbPaletteStr {
 		rgbPalette = append(rgbPalette, parseRGB(s))
 	}
-	fmt.Printf("Initializing color palette %v\n", rgbPalette)
 }

@@ -1,10 +1,13 @@
 package sprites
 
 import (
+	"encoding/xml"
 	"fmt"
 	"image"
 	"image/png"
 	"io"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/bereal/zools/pkg/color"
@@ -39,16 +42,17 @@ func (c Cell) Encode(bg color.ZXAttr) (color.ZXAttr, []byte) {
 }
 
 type Tile struct {
-	img WithSubImage
+	img  WithSubImage
+	Name string
 }
 
-func (t Tile) Split(w, h int) []Tile {
+func (t Tile) Split(w, h int) []*Tile {
 	subs := splitImage(t.img, w, h)
 	dedups := deduplicateImages(subs)
 
-	res := make([]Tile, len(dedups))
+	res := make([]*Tile, len(dedups))
 	for i, img := range dedups {
-		res[i] = Tile{img.(WithSubImage)}
+		res[i] = &Tile{img.(WithSubImage), fmt.Sprintf("%s-%d", t.Name, i)}
 	}
 	return res
 }
@@ -64,12 +68,11 @@ func (t Tile) EncodeBinary(bg color.ZXAttr) []byte {
 	return res
 }
 
-func (t Tile) EncodeAsm(name string, bg color.ZXAttr) []string {
+func (t Tile) EncodeAsm(bg color.ZXAttr) []string {
 	bin := t.EncodeBinary(bg)
 	var lines []string
-	label := strings.ReplaceAll(name, "-", "_")
 
-	lines = append(lines, fmt.Sprintf("%s:", label))
+	lines = append(lines, fmt.Sprintf("%s:", t.Name))
 	cell := 0
 	var visibleCells []bool
 	for i := 0; i < len(bin); i += 9 {
@@ -102,10 +105,54 @@ func (t Tile) EncodePNG(w io.Writer) error {
 	return png.Encode(w, t.img)
 }
 
-func ReadTile(r io.Reader) (*Tile, error) {
+func ReadTilePNG(pngPath string) (*Tile, error) {
+	name := strings.TrimSuffix(path.Base(pngPath), path.Ext(pngPath))
+	r, err := os.Open(pngPath)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
 	img, err := png.Decode(r)
 	if err != nil {
 		return nil, err
 	}
-	return &Tile{img.(WithSubImage)}, nil
+	return &Tile{img.(WithSubImage), strings.ReplaceAll(name, "-", "_")}, nil
+}
+
+type Tileset []*Tile
+
+type xmlTile struct {
+	ID    int `xml:"id,attr"`
+	Image struct {
+		Source string `xml:"source,attr"`
+	} `xml:"image"`
+}
+
+type xmlTileset struct {
+	Tiles []xmlTile `xml:"tile"`
+}
+
+func ReadTSX(tsxPath string) (Tileset, error) {
+	data, err := os.ReadFile(tsxPath)
+	if err != nil {
+		return nil, err
+	}
+	var tileset xmlTileset
+	err = xml.Unmarshal([]byte(data), &tileset)
+	if err != nil {
+		return nil, err
+	}
+
+	basedir := path.Dir(tsxPath)
+	res := make(Tileset, len(tileset.Tiles))
+	for i, tile := range tileset.Tiles {
+		imgPath := path.Join(basedir, tile.Image.Source)
+		tileImg, err := ReadTilePNG(imgPath)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = tileImg
+	}
+	println("Tileset loaded", len(res), "tiles")
+	return res, nil
 }

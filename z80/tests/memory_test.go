@@ -1,4 +1,4 @@
-package ngn
+package z80
 
 import (
 	"path"
