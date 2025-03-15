@@ -125,6 +125,43 @@ func (s Sprite) EncodeZigZag(masked bool) []byte {
 	return encoded
 }
 
+func (s Sprite) EncodeFifthAngel() []byte {
+	encoded := []byte{0}
+	symmetric := true
+
+	encodeCell := func(col, row int, masked bool) []byte {
+		var result []byte
+		for i := 0; i < 8; i++ {
+			mask, sprite := s.encodeChunk(col, row+i)
+			if masked {
+				result = append(result, mask)
+			}
+			result = append(result, sprite)
+		}
+		return result
+	}
+
+	size := s.img.Bounds().Size()
+	for y := 0; y < size.Y; y += 8 {
+		if symmetric {
+			for x := 0; symmetric && x < size.X/2; x++ {
+				m1, c1 := s.pixelAt(x, y)
+				m2, c2 := s.pixelAt(size.X-x-1, y)
+				symmetric = m1 == m2 && c1 == c2
+				fmt.Printf("symmetric: %v m1=%d, m2=%d, c1=%d, c2=%d\n", symmetric, m1, m2, c1, c2)
+			}
+		}
+		for x := 0; x < size.X; x += 8 {
+			encoded = append(encoded, encodeCell(x, y, y < size.Y/2)...)
+		}
+	}
+
+	if symmetric {
+		encoded[0] |= 0x80
+	}
+	return encoded
+}
+
 func (s Sprite) EncodePNG(w io.Writer) error {
 	return png.Encode(w, s.img)
 }

@@ -93,11 +93,13 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 		encode = func(s sprites.Sprite) []byte { return s.EncodeZigZag(masked) }
 	case "cell":
 		encode = func(s sprites.Sprite) []byte { return s.EncodeByCell(masked) }
+	case "fifth-angel":
+		encode = func(s sprites.Sprite) []byte { return s.EncodeFifthAngel() }
 	default:
 		log.Fatalf("Invalid direction: %s", direction)
 	}
 
-	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
+	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	check(err)
 	defer out.Close()
 
@@ -127,7 +129,7 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 				check(err)
 			case "asm":
 				// TODO use the asm package when it's ready
-				label := fmt.Sprintf("tile_%d", i)
+				label := fmt.Sprintf("sprite_%d", i)
 				if len(sprites) > 1 {
 					label += fmt.Sprintf("_%d", j)
 				}
@@ -154,7 +156,7 @@ func encodeTile(cmd *cobra.Command, args []string) {
 		log.Fatalf("Invalid encoding: %s", encoding)
 	}
 
-	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
+	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	check(err)
 	defer out.Close()
 
