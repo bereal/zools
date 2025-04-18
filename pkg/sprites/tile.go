@@ -91,10 +91,12 @@ func (t Tile) EncodeAsm(bg color.ZXAttr) []string {
 	cell = 0
 	for i := 0; i < len(bin); i += 9 {
 		if visibleCells[cell] {
-			lines = append(lines, fmt.Sprintf(".cell_%d:", cell))
+			// var bytes []string
 			for j := 1; j <= 8; j++ {
-				lines = append(lines, fmt.Sprintf("\tdg %s", encodeGraphicsByte(bin[i+j])))
+				// bytes = append(bytes, fmt.Sprintf("0x%02x", bin[i+j]))
+				lines = append(lines, fmt.Sprintf("\tdb %s", encodeGraphicsByte(bin[i+j])))
 			}
+			// lines = append(lines, fmt.Sprintf(".cell_%d %s", cell, strings.Join(bytes, ", ")))
 		}
 		cell++
 	}

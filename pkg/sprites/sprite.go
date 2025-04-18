@@ -148,7 +148,6 @@ func (s Sprite) EncodeFifthAngel() []byte {
 				m1, c1 := s.pixelAt(x, y)
 				m2, c2 := s.pixelAt(size.X-x-1, y)
 				symmetric = m1 == m2 && c1 == c2
-				fmt.Printf("symmetric: %v m1=%d, m2=%d, c1=%d, c2=%d\n", symmetric, m1, m2, c1, c2)
 			}
 		}
 		for x := 0; x < size.X; x += 8 {

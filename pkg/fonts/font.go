@@ -3,7 +3,6 @@ package fonts
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 
 	"golang.org/x/text/encoding/charmap"
@@ -118,7 +117,7 @@ func (f *Font) Write(w io.Writer) error {
 }
 
 func (f *Font) ReadYaml(r io.Reader) error {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

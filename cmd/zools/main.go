@@ -13,6 +13,7 @@ import (
 	"github.com/bereal/zools/pkg/fonts"
 	"github.com/bereal/zools/pkg/maps"
 	"github.com/bereal/zools/pkg/sprites"
+	"github.com/bereal/zools/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -125,7 +126,7 @@ func encodeSprite(cmd *cobra.Command, args []string) {
 			data := encode(s)
 			switch encoding {
 			case "binary":
-				_, err := out.Write(encode(s))
+				_, err := out.Write(data)
 				check(err)
 			case "asm":
 				// TODO use the asm package when it's ready
@@ -232,6 +233,29 @@ func encodeMap(cmd *cobra.Command, args []string) {
 	}
 }
 
+func encodeText(cmd *cobra.Command, args []string) {
+	output := cmd.Flags().Lookup("output").Value.String()
+	langs, _ := cmd.Flags().GetString("langs")
+	if langs == "" {
+		log.Fatalf("No languages specified")
+	}
+	langList := strings.Split(langs, ",")
+
+	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	check(err)
+	defer out.Close()
+
+	f, err := os.Open(args[0])
+	check(err)
+	defer f.Close()
+
+	bundle, err := text.ReadI18nBundle(f)
+	check(err)
+
+	err = bundle.Encode(langList, out)
+	check(err)
+}
+
 func main() {
 	cmd := &cobra.Command{
 		Use: "zools [cmd] [options]",
@@ -284,7 +308,16 @@ func main() {
 	encodeMap.Flags().StringP("output", "o", "", "")
 	encodeMap.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
 
-	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap)
+	encodeText := &cobra.Command{
+		Use:  "encode-text file",
+		Run:  encodeText,
+		Args: cobra.ExactArgs(1),
+	}
+
+	encodeText.Flags().StringP("langs", "l", "", "")
+	encodeText.Flags().StringP("output", "o", "", "")
+
+	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap, encodeText)
 
 	err := cmd.Execute()
 	if err != nil {
