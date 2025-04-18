@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/bereal/zools/pkg/asm"
 	"github.com/bereal/zools/pkg/color"
 )
 
@@ -68,22 +69,21 @@ func (t Tile) EncodeBinary(bg color.ZXAttr) []byte {
 	return res
 }
 
-func (t Tile) EncodeAsm(bg color.ZXAttr) []string {
+func (t Tile) EncodeAsm(bg color.ZXAttr, b *asm.Builder) {
 	bin := t.EncodeBinary(bg)
-	var lines []string
 
-	lines = append(lines, fmt.Sprintf("%s:", t.Name))
+	b.Label(t.Name)
 	cell := 0
 	var visibleCells []bool
 	for i := 0; i < len(bin); i += 9 {
 		attr := color.ZXAttr(bin[i])
-		lines = append(lines, fmt.Sprintf("\tdb 0x%02x", attr))
+		b.DEFB("", []byte{byte(attr)})
 		visible := color.ZXAttr(attr).Invert() != attr
 		visibleCells = append(visibleCells, visible)
 		if visible {
-			lines = append(lines, fmt.Sprintf("\tdw .cell_%d", cell))
+			b.Ref("", fmt.Sprintf(".cell_%d", cell))
 		} else {
-			lines = append(lines, "\tdw 0")
+			b.DEFW("", []int{0})
 		}
 		cell++
 	}
@@ -91,16 +91,11 @@ func (t Tile) EncodeAsm(bg color.ZXAttr) []string {
 	cell = 0
 	for i := 0; i < len(bin); i += 9 {
 		if visibleCells[cell] {
-			// var bytes []string
-			for j := 1; j <= 8; j++ {
-				// bytes = append(bytes, fmt.Sprintf("0x%02x", bin[i+j]))
-				lines = append(lines, fmt.Sprintf("\tdb %s", encodeGraphicsByte(bin[i+j])))
-			}
-			// lines = append(lines, fmt.Sprintf(".cell_%d %s", cell, strings.Join(bytes, ", ")))
+			b.Label(fmt.Sprintf(".cell_%d", cell))
+			b.DEFB("", bin[i+1:i+9])
 		}
 		cell++
 	}
-	return lines
 }
 
 func (t Tile) EncodePNG(w io.Writer) error {

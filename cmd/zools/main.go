@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bereal/zools/pkg/asm"
 	"github.com/bereal/zools/pkg/fonts"
 	"github.com/bereal/zools/pkg/maps"
 	"github.com/bereal/zools/pkg/sprites"
@@ -193,9 +194,9 @@ func encodeTile(cmd *cobra.Command, args []string) {
 			_, err = out.Write(tile.EncodeBinary(0))
 			check(err)
 		case "asm":
-			code := tile.EncodeAsm(0)
-			_, err = out.WriteString(strings.Join(code, "\n") + "\n")
-			check(err)
+			b := asm.NewBuilder()
+			tile.EncodeAsm(0, b)
+			check(b.Write(out))
 		}
 	}
 }
