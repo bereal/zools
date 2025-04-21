@@ -18,7 +18,9 @@ func NewBuilder() *Builder {
 }
 
 func (m *Builder) Label(label string) *Builder {
-	m.lines = append(m.lines, label)
+	if label != "" {
+		m.lines = append(m.lines, label)
+	}
 	return m
 }
 
@@ -27,7 +29,7 @@ func (m *Builder) Str(label, s string) *Builder {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	m.DEFB(label, []byte(koi8))
+	m.DEFB(label, append([]byte(koi8), 0))
 	return m
 }
 
@@ -58,6 +60,28 @@ func (m *Builder) DEFW(label string, data []int) *Builder {
 		elems = append(elems, fmt.Sprintf("0x%02x", b))
 	}
 	return m.Linef(label, "dw %s", strings.Join(elems, ", "))
+}
+
+func (m *Builder) DEFG(label string, data []int) *Builder {
+	encodeGraphicsByte := func(b byte) string {
+		var res string
+		var mask byte
+		for mask = 0x80; mask != 0; mask >>= 1 {
+			if b&mask != 0 {
+				res += "#"
+			} else {
+				res += "."
+			}
+		}
+		return res
+	}
+
+	m.Label(label)
+	for _, b := range data {
+		m.Linef("", "dg %s", encodeGraphicsByte(byte(b)))
+	}
+
+	return m
 }
 
 func (m *Builder) Ref(label string, name ...string) *Builder {

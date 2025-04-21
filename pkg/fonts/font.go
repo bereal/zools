@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/bereal/zools/pkg/asm"
 	"golang.org/x/text/encoding/charmap"
 	"gopkg.in/yaml.v3"
 )
@@ -20,7 +21,7 @@ func ParseCharLine(s string) (int, byte) {
 
 	for _, c := range fmt.Sprintf("%8s", s) {
 		var i byte
-		if c != ' ' {
+		if c == '%' {
 			i = 1
 		}
 		data = (data << 1) + i
@@ -83,6 +84,29 @@ func (f *Font) ParseChars(data map[string]string) {
 	for k, v := range data {
 		char := ParseCharacter(v)
 		f.AddChar(k, char)
+	}
+}
+
+func (f *Font) EncodeAsm(b *asm.Builder) {
+	var i byte
+	var gap int
+	b.DEFB("", []byte{0, 0, 0, 0, 0, 0, 0, 1})
+	for i = 33; i < 255; i++ {
+		if i >= 128 && i < 128+32 {
+			continue
+		}
+
+		key := charmap.KOI8R.DecodeByte(i)
+		if char, ok := f.chars[key]; ok {
+			if gap > 0 {
+				b.Line("", fmt.Sprintf(".%d db 0", 8*gap))
+			}
+			gap = 0
+			b.Linef("", fmt.Sprintf("; %c (0x%x)", key, i))
+			b.DEFB("", char.Encode())
+		} else {
+			gap += 1
+		}
 	}
 }
 

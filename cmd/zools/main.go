@@ -27,7 +27,7 @@ func check(err error, args ...string) {
 	}
 }
 
-func packFont(cmd *cobra.Command, args []string) {
+func encodeFont(cmd *cobra.Command, args []string) {
 	output := cmd.Flags().Lookup("output").Value.String()
 	font := fonts.NewFont()
 	for _, infile := range args {
@@ -38,10 +38,12 @@ func packFont(cmd *cobra.Command, args []string) {
 		check(font.ReadYaml(f))
 	}
 
-	f, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
+	f, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	check(err)
 
-	font.Write(f)
+	b := asm.NewBuilder()
+	font.EncodeAsm(b)
+	b.Write(f)
 	f.Close()
 }
 
@@ -262,13 +264,13 @@ func main() {
 		Use: "zools [cmd] [options]",
 	}
 
-	packFontCmd := &cobra.Command{
-		Use:  "pack-font file1 [...file2]",
-		Run:  packFont,
+	encodeFontCmd := &cobra.Command{
+		Use:  "encode-fonts file1 [...file2]",
+		Run:  encodeFont,
 		Args: cobra.MinimumNArgs(1),
 	}
 
-	packFontCmd.Flags().StringP("output", "o", "", "")
+	encodeFontCmd.Flags().StringP("output", "o", "", "")
 
 	encodeSpriteCmd := &cobra.Command{
 		Use:  "encode-sprite [files]",
@@ -318,7 +320,7 @@ func main() {
 	encodeText.Flags().StringP("langs", "l", "", "")
 	encodeText.Flags().StringP("output", "o", "", "")
 
-	cmd.AddCommand(packFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap, encodeText)
+	cmd.AddCommand(encodeFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap, encodeText)
 
 	err := cmd.Execute()
 	if err != nil {

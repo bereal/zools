@@ -85,13 +85,3 @@ func (b I18nBundle) Encode(langOrder []string, w io.Writer) error {
 	}
 	return nil
 }
-
-// func (b I18nBundle) Encode(langOrder []string) []string {
-// 	for name, str := range b {
-// 		for _, lang := range langOrder {
-// 			if _, ok := b[lang]; !ok {
-// 				continue
-// 			}
-// 		}
-// 	}
-// }
