@@ -1,6 +1,6 @@
 module github.com/bereal/zools
 
-go 1.22
+go 1.24
 
 require (
 	github.com/koron-go/z80 v0.0.0-20200903165616-eda49ee3c3e3

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strings"
 
 	"golang.org/x/text/encoding/charmap"
@@ -29,8 +30,7 @@ func (m *Builder) Str(label, s string) *Builder {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	m.DEFB(label, append([]byte(koi8), 0))
-	return m
+	return m.DEFB(label, append([]byte(koi8), 0))
 }
 
 func (m *Builder) Line(label, s string) *Builder {
@@ -47,11 +47,16 @@ func (m *Builder) Linef(label, format string, a ...interface{}) *Builder {
 }
 
 func (m *Builder) DEFB(label string, data []byte) *Builder {
-	elems := make([]string, 0, len(data))
-	for _, b := range data {
-		elems = append(elems, fmt.Sprintf("0x%02x", b))
+	chunks := slices.Chunk(data, 32)
+	for chunk := range chunks {
+		elems := make([]string, 0, len(chunk))
+		for _, b := range chunk {
+			elems = append(elems, fmt.Sprintf("0x%02x", b))
+		}
+		m.Linef(label, "db %s", strings.Join(elems, ", "))
+		label = ""
 	}
-	return m.Linef(label, "db %s", strings.Join(elems, ", "))
+	return m
 }
 
 func (m *Builder) DEFW(label string, data []int) *Builder {
