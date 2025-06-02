@@ -26,11 +26,33 @@ func (m *Builder) Label(label string) *Builder {
 }
 
 func (m *Builder) Str(label, s string) *Builder {
-	koi8, err := charmap.KOI8R.NewEncoder().String(s)
+	koi8, err := charmap.KOI8R.NewEncoder().Bytes([]byte(s))
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	return m.DEFB(label, append([]byte(koi8), 0))
+
+	processed := make([]byte, 0, len(koi8))
+	var esc bool
+	for _, c := range koi8 {
+		if esc {
+			switch c {
+			case '<':
+				processed = append(processed, 1)
+			case '\\':
+				processed = append(processed, '\\')
+			}
+			esc = false
+			continue
+		}
+
+		if c == '\\' {
+			esc = true
+			continue
+		}
+
+		processed = append(processed, c)
+	}
+	return m.DEFB(label, append(processed, 0))
 }
 
 func (m *Builder) Line(label, s string) *Builder {
@@ -47,12 +69,14 @@ func (m *Builder) Linef(label, format string, a ...interface{}) *Builder {
 }
 
 func (m *Builder) DEFB(label string, data []byte) *Builder {
-	chunks := slices.Chunk(data, 32)
+	chunks := slices.Chunk(data, 16)
+	println("DEFB")
 	for chunk := range chunks {
 		elems := make([]string, 0, len(chunk))
 		for _, b := range chunk {
 			elems = append(elems, fmt.Sprintf("0x%02x", b))
 		}
+		fmt.Printf("chunk: %v\n", elems)
 		m.Linef(label, "db %s", strings.Join(elems, ", "))
 		label = ""
 	}
