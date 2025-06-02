@@ -130,6 +130,15 @@ func (t I18nText) Encode(label string, langOrder []string, b *asm.Builder) {
 	}
 }
 
+func (t I18nText) EncodeMono(label string, lang string, b *asm.Builder) {
+	b.Label(label)
+	if block, ok := t[lang]; ok {
+		block.Encode("", b)
+	} else {
+		b.DEFB("", []byte{0})
+	}
+}
+
 type I18nBundle map[string]I18nText
 
 func ReadI18nBundle(r io.Reader) (I18nBundle, error) {
@@ -158,6 +167,17 @@ func (b I18nBundle) Encode(langOrder []string, w io.Writer) error {
 	for name, i18n := range b {
 		builder := asm.NewBuilder()
 		i18n.Encode(name, langOrder, builder)
+		if err := builder.Write(w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b I18nBundle) EncodeMono(lang string, w io.Writer) error {
+	for name, i18n := range b {
+		builder := asm.NewBuilder()
+		i18n.EncodeMono(name, lang, builder)
 		if err := builder.Write(w); err != nil {
 			return err
 		}

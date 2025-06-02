@@ -255,8 +255,10 @@ func encodeText(cmd *cobra.Command, args []string) {
 	bundle, err := text.ReadI18nBundle(f)
 	check(err)
 
-	err = bundle.Encode(langList, out)
-	check(err)
+	if mono, _ := cmd.Flags().GetBool("mono"); mono {
+		err = bundle.EncodeMono(langList[0], out)
+		check(err)
+	}
 }
 
 func main() {
@@ -319,6 +321,7 @@ func main() {
 
 	encodeText.Flags().StringP("langs", "l", "", "")
 	encodeText.Flags().StringP("output", "o", "", "")
+	encodeText.Flags().BoolP("mono", "m", false, "do not generate i18n refs, only one language")
 
 	cmd.AddCommand(encodeFontCmd, encodeSpriteCmd, splitTile, encodeTiles, encodeMap, encodeText)
 
