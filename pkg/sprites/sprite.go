@@ -130,18 +130,26 @@ func (s Sprite) EncodeFifthAngel() []byte {
 	symmetric := true
 
 	encodeCell := func(col, row int, masked bool) []byte {
-		var result []byte
+		result := []byte{0x87} // default attribute
+		empty := true
 		for i := 0; i < 8; i++ {
 			mask, sprite := s.encodeChunk(col, row+i)
 			if masked {
 				result = append(result, mask)
 			}
+			if sprite != 0 {
+				empty = false
+			}
 			result = append(result, sprite)
+		}
+		if empty {
+			result[0] = 0
 		}
 		return result
 	}
 
 	size := s.img.Bounds().Size()
+	row := 0
 	for y := 0; y < size.Y; y += 8 {
 		if symmetric {
 			for x := 0; symmetric && x < size.X/2; x++ {
@@ -151,8 +159,13 @@ func (s Sprite) EncodeFifthAngel() []byte {
 			}
 		}
 		for x := 0; x < size.X; x += 8 {
-			encoded = append(encoded, encodeCell(x, y, y < size.Y/2)...)
+			cell := encodeCell(x, y, y < size.Y/2)
+			if row == 0 {
+				cell[0] = 0x7f & cell[0]
+			}
+			encoded = append(encoded, cell...)
 		}
+		row++
 	}
 
 	if symmetric {

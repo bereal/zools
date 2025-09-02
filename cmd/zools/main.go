@@ -178,7 +178,7 @@ func encodeTile(cmd *cobra.Command, args []string) {
 			check(err)
 			tiles = append(tiles, tileset...)
 		default:
-			log.Fatalf("Unknown tileset file extension: %s", ext)
+			log.Fatalf("Unknown tileset file extension: %s", arg)
 		}
 	}
 
@@ -190,6 +190,7 @@ func encodeTile(cmd *cobra.Command, args []string) {
 		}
 		fmt.Fprintf(out, "empty_tile:\t.12 db 0\n")
 	}
+
 	for _, tile := range tiles {
 		switch encoding {
 		case "binary":
@@ -304,6 +305,7 @@ func main() {
 	}
 	encodeTiles.Flags().StringP("output", "o", "", "")
 	encodeTiles.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
+	// encodeTiles.Flags().IntP("add-attr", "a", 0, "add attribute to the tile by OR")
 
 	encodeMap := &cobra.Command{
 		Use:  "encode-map file",
