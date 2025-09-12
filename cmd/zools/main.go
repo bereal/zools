@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"sort"
@@ -17,6 +18,36 @@ import (
 	"github.com/bereal/zools/pkg/text"
 	"github.com/spf13/cobra"
 )
+
+func zx0(data []byte) ([]byte, error) {
+	path := os.Getenv("ZX0")
+	if path == "" {
+		path = "zx0"
+	}
+	tmpfile, err := os.CreateTemp(os.TempDir(), "zools_*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpfile.Name())
+	_, err = tmpfile.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := tmpfile.Close(); err != nil {
+		return nil, err
+	}
+	_, err = exec.Command(path, "-f", tmpfile.Name(), tmpfile.Name()).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := os.ReadFile(tmpfile.Name())
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("ZX0: %d -> %d\n", len(data), len(c))
+	return c, nil
+}
 
 func check(err error, args ...string) {
 	if err != nil {
@@ -210,6 +241,10 @@ func encodeMap(cmd *cobra.Command, args []string) {
 	if encoding != "asm" && encoding != "binary" {
 		log.Fatalf("Invalid encoding: %s", encoding)
 	}
+	useZX0, _ := cmd.Flags().GetBool("zx0")
+	if useZX0 && encoding != "binary" {
+		log.Fatalf("ZX0 compression is only supported for binary encoding")
+	}
 
 	out, err := os.OpenFile(output, os.O_CREATE|os.O_RDWR, 0644)
 	check(err)
@@ -228,7 +263,12 @@ func encodeMap(cmd *cobra.Command, args []string) {
 
 	switch encoding {
 	case "binary":
-		_, err = out.Write(m.EncodeBinary())
+		data := m.EncodeBinary()
+		if useZX0 {
+			data, err = zx0(data)
+			check(err)
+		}
+		_, err = out.Write(data)
 		check(err)
 	case "asm":
 		code := m.EncodeAsm()
@@ -314,6 +354,7 @@ func main() {
 	}
 	encodeMap.Flags().StringP("output", "o", "", "")
 	encodeMap.Flags().StringP("encoding", "e", "binary", "encoding (binary, asm)")
+	encodeMap.Flags().BoolP("zx0", "", false, "compress with zx0")
 
 	encodeText := &cobra.Command{
 		Use:  "encode-text file",
